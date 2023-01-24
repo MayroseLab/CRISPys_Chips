@@ -589,7 +589,6 @@ def order_output_list(final_list: List) -> Dict:
 def chips_main(crispys_output_path: str = None,
                crispys_output_name: str = "crispys_output",
                chips_output_name: str = "chips",
-               restriction_site: str = "None",
                genome_by_chr_path: str = None,
                pam_file_path: str = None,
                gff_file_path: str = None,
@@ -601,8 +600,10 @@ def chips_main(crispys_output_path: str = None,
                n_sgrnas: int = 2,
                threads: int = 1,
                number_of_singletons: int = 5,
-               scoring_function: str = "gold-off",
-               min_sg_per_gene: int = 4):
+               scoring_function: str = "moff",
+               restriction_site: str = "None",
+               min_sg_per_gene: int = 4,
+               include_all_family_gene: bool = False):
     """
     This is the main function of crispys-chips, it read the result of crispys and apply on them the chips algorithm.
     First, an off-target search is done and only gRNAs that pass it will be processed in further steps.
@@ -634,6 +635,8 @@ def chips_main(crispys_output_path: str = None,
         scoring_function: the scoring function to use in off-target search
         min_sg_per_gene: the minimum number of gRNA targeting each gene, for each group of genes, when all genes in the
         internal node will pass this number no more gRNA will be written this group of genes.
+        include_all_family_gene: when filtering off-targets, if the off-target is in a gene belong to the main family
+        (before the split for crispys) dont filter it when this param is False.
 
     Returns:
 
@@ -654,11 +657,14 @@ def chips_main(crispys_output_path: str = None,
                                       pam_file_path, max_number_of_mismatches, lower_intersect_limit,
                                       upper_intersect_limit, threads, scoring_function)
 
-    # get the original family genes name (before the split to smaller families) in order to ignore off-taeget hiting
-    # these genes
+    # optionaly, get the original family genes name (before the split to smaller families) in order to ignore off-taeget
+    # hiting these genes
     family_name = list_of_subgroup_results[0].family_name
-    familiy_genes_dict = pickle.load(open(globals.familiy_genes_dict_path, 'rb'))
-    genes_to_ignore_set = set(familiy_genes_dict[family_name])
+    if include_all_family_gene:
+        familiy_genes_dict = pickle.load(open(globals.familiy_genes_dict_path, 'rb'))
+        genes_to_ignore_set = set(familiy_genes_dict[family_name])
+    else:
+        genes_to_ignore_set = {}
 
     # filter by genomic region
     list_of_candidates_filtered = filter_main(list_of_candidates, crispys_output_path, globals.feature_score_dict,
@@ -744,15 +750,11 @@ def parse_arguments(parser_obj: argparse.ArgumentParser):
     parser_obj.add_argument('--crispys_output_path', '-crispys', type=str,
     help='The path to CRISPys output folder')
 
-    parser_obj.add_argument( '--crispys_output_name', '-crispys_name', type=str,
+    parser_obj.add_argument('--crispys_output_name', '-crispys_name', type=str,
                              help='crispys output name')
 
     parser_obj.add_argument('--chips_output_name', '-chips_name', type=str,
                              help='Chips output name')
-
-
-    parser_obj.add_argument( '--restriction_site', '-restriction', type=str,
-                         help='The sequence of restriction site')
 
     parser_obj.add_argument('--genome_by_chr_path', '-genome_chr', type=str,
                              help='The path to the folder with chromosome fasta files (for crispritz)',
@@ -763,9 +765,8 @@ def parse_arguments(parser_obj: argparse.ArgumentParser):
 
     parser_obj.add_argument('--gff_file_path', '-gff', type=str, help='The path to the gff file', default=None)
 
-
     parser_obj.add_argument('--max_number_of_mismatches', '-n_mm', type=int, default=4,
-                             help='Number of mismatches to alow when searching for off-targets')
+                             help='Number of mismatches to allow when searching for off-targets')
 
     parser_obj.add_argument('--lower_intersect_limit', '-lower', type=int, default=10,
                              help='The minimum overlap between guide and off-target')
@@ -791,6 +792,9 @@ def parse_arguments(parser_obj: argparse.ArgumentParser):
 
     parser_obj.add_argument('--scoring_function', '-scoring', type=str, help="The scoring function to use",
                              default="gold-off", choices=['gold_off', 'moff'])
+
+    parser_obj.add_argument('--restriction_site', '-restriction', type=str,
+                         help='The sequence of restriction site')
 
     parser_obj.add_argument('--min_sg_per_gene', '-min_sg', type=int, help="The minimum number of gRNAs for any gene",
                          default=4)
