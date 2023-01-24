@@ -732,6 +732,9 @@ def chips_main(crispys_output_path: str = None,
     final_list = get_final_multiplx_list(multiplx_dict, min_sg_per_gene)
     # order the results back to dictionary of {"name":{best_seq: list_of_bestsggroups}}
     final_output_dict = order_output_list(final_list)
+    # save results to pickle
+    with open(f"{os.path.join(crispys_output_path, chips_output_name)}.p", 'wb') as f:
+        pickle.dump(final_output_dict, f)
     # write results to csv file
     create_output_multiplex(crispys_output_path, {"Chips_final_results":final_output_dict}, number_of_groups,
                             n_with_best_guide, n_sgrnas, chips_output_name)
