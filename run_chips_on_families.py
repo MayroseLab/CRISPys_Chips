@@ -28,10 +28,10 @@ def check_if_results_exist(fam_path, crispys_output_name, chips_output_name):
 
 
 
-def run(code_path: str, main_folder_path: str, crispys_name: str, chips_name: str, n_mm: int = 4, lower: int = 10,
-        upper: int = 20, n_groups: int = 20, n_best: int = 5, n_grna: int = 2, n_singletons: int = 5,
-        scoring: str = 'moff', ncpu: int = 4, mem: int = 16, queue: str = "itaym",
-        crispys_output_name: str = "crispys_output", restriction_site: str = "None", chips_output_name: str = "chips"):
+def run(code_path: str, main_folder_path: str, crispys_name: str = "crispys_output", chips_name: str = "chips",
+        n_mm: int = 4, lower: int = 10, upper: int = 20, n_groups: int = 20, n_best: int = 5, n_grna: int = 2,
+        n_singletons: int = 5, scoring: str = 'moff', ncpu: int = 4, mem: int = 16, queue: str = "itaym",
+        restriction_site: str = "None", chips_output_name: str = "chips"):
     """
     A wrapper function to run CRUNCH on the cluster for multiple folders
     Args:
@@ -55,9 +55,9 @@ def run(code_path: str, main_folder_path: str, crispys_name: str, chips_name: st
     for family in families:
         fam_path = os.path.join(main_folder_path, family)
         if os.path.isdir(fam_path) and not family.startswith("."):
-            if not check_if_results_exist(fam_path, crispys_output_name, chips_output_name):
+            if not check_if_results_exist(fam_path, crispys_name, chips_output_name):
                 continue
-            header = createHeaderJob(fam_path, job_name=f"{family}_{crispys_output_name}_{chips_output_name}",
+            header = createHeaderJob(fam_path, job_name=f"{family}_{crispys_name}_{chips_output_name}",
                                       ncpu=ncpu, mem=mem,
                                       queue=queue)
 
@@ -66,7 +66,7 @@ def run(code_path: str, main_folder_path: str, crispys_name: str, chips_name: st
                       f"-pam_file {globals.pam_file_path} -gff {globals.gff_file} -n_mm {n_mm} -lower {lower}" \
                       f" -upper {upper} -groups {n_groups} -n_guide {n_best} -sgrnas {n_grna} -th {ncpu} -n_singletons " \
                       f"{n_singletons} -scoring {scoring} -restriction {restriction_site}"
-            sh_file_path = os.path.join(fam_path, f"{family}_{crispys_output_name}_{chips_output_name}.sh")
+            sh_file_path = os.path.join(fam_path, f"{family}_{crispys_name}_{chips_output_name}.sh")
             with open(sh_file_path, "w") as f:
                 f.write(f"{header}\n{command}")
             os.system(f"qsub {sh_file_path}")
