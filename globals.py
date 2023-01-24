@@ -8,6 +8,8 @@ import pandas as pd
 # get the path of the scripts directory
 CODE_PATH = os.path.dirname(os.path.realpath(__file__))
 
+conda_environment = "CRISPys-Chips"
+
 # for crispritz you need to give a path to folder where there are files with fatsat of each chromosome
 # you can make those files using splitfasta https://pypi.org/project/split-fasta/
 genome_by_chr_path = "/groups/itay_mayrose/udiland/crispys_chips_arabidopsis/ath_split_files"
