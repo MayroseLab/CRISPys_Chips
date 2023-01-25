@@ -697,7 +697,10 @@ def chips_main(crispys_output_path: str = None,
     list_of_subgroup_no_offtargets = recreate_subgroup_lst(list_of_candidates_filtered)
     # insert singleton subgroup to subgroups without singleton and create a list of subgroups without sinlgetons
     new_subgroups_lst = add_singletons_to_subgroup(list_of_subgroup_no_offtargets, number_of_singletons)
-
+    # Stop if the list is empty
+    if not new_subgroups_lst:
+        print("No input for Chips")
+        quit()
 ##### start Chips ####################################################################################################
     global pos_dict
     global guide_seq_dict
