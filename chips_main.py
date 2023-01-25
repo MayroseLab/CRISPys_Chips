@@ -78,6 +78,25 @@ class BestSgGroup:
         return f"{self.best_candidate} , {self.subgroups}"
 
 
+def only_singletons(subgroup_list: List) -> bool:
+    """
+    This function check if crispys result contain only singletons
+    and if so return True, otherwise return False
+    Args:
+        subgroup_list: list of SubgroupRes
+
+    Returns:
+            True or False depend if all results are of singletons
+    """
+    only_singletons = True
+    for subgroup in subgroup_list:
+        for candidate in subgroup.candidates_list:
+            if len(candidate.genes_score_dict.keys()) > 1:
+                only_singletons = False
+                return only_singletons
+    return only_singletons
+
+
 def add_singletons_to_subgroup(subgroup_list: list, number_of_singletons: int = 5) -> list:
     """
     This function takes the output of crispys that contain subgroupRes object with singletons (targeting one gene)
@@ -646,7 +665,10 @@ def chips_main(crispys_output_path: str = None,
     pickle_name = [file for file in os.listdir(crispys_output_path) if file.endswith(f"{crispys_output_name}.p")][0]
     pickle_file = os.path.join(crispys_output_path, pickle_name)
     list_of_subgroup_results = pickle.load(open(pickle_file, 'rb'))
-
+    # Check that the results has internal node (not only singletons)
+    if only_singletons(list_of_subgroup_results):
+        print(f"Only singletons in {pickle_name}")
+        exit()
     # Convert the list of internal node results into a list of CandidateWithOffTargets object.
     list_of_candidates = concat_candidates_from_subgroups(list_of_subgroup_results)
     # remove restriction site
