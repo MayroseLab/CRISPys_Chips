@@ -4,7 +4,7 @@ from typing import List, Dict
 
 
 def sub_tree_display(candidates_lst, f):
-    header_row = "sgRNA index,sgRNA,Score,Genes,Genes score,Target site,#mms,Position,strand,PAM,off-targets\n"
+    header_row = "sgRNA index,sgRNA,Score,Genes,Genes score,Target site,#mms,Position,Strand,PAM,Family, Off-targets\n"
 
     f.write(header_row)
     sgRNA_index = 0
@@ -39,6 +39,8 @@ def sub_tree_display(candidates_lst, f):
                     f.write("," + target[4])
                     # write pam
                     f.write("," + target[2])
+                    # write family name
+                    f.write("," + candidate.subgroup.family_name)
                     # write off_targets
                     top_off_trgt = return_top_off_targets(candidate)
                     f.write(f',"{str(top_off_trgt).strip("[]")}"')
@@ -57,6 +59,8 @@ def sub_tree_display(candidates_lst, f):
                     f.write("," + target[4])
                     # write pam
                     f.write("," + target[2])
+                    # write family name
+                    f.write( "," + candidate.subgroup.family_name )
                     # write off_targets
                     top_off_trgt = return_top_off_targets(candidate)
                     f.write(f',"{str(top_off_trgt).strip("[]")}"')
@@ -78,6 +82,8 @@ def sub_tree_display(candidates_lst, f):
                     f.write("," + target[4])
                     # write pam
                     f.write("," + target[2])
+                    # write family name
+                    f.write("," + candidate.subgroup.family_name)
                     # write off_targets
                     top_off_trgt = return_top_off_targets(candidate)
                     f.write(f',"{str(top_off_trgt).strip("[]")}"')
@@ -192,6 +198,38 @@ def get_genes_of_nodes(multiplex_dict, node):
         for can in best.all_candidates:
             genes.extend(can.genes_score_dict.keys())
     return set(genes)
+
+
+def write_library_csv(path: str, bestgroup_dict: Dict, output_name: str, n_families: int, n_singletons: int,
+                      n_no_input: int, families_with_no_output: int):
+    """
+    This function is used to create the final chips library csv output
+    Args:
+        path: path to write the file
+        bestgroup_dict: chips results, a dictionary of best_seq:BestSgGroup object
+        output_name: name of output file
+        n_families: nu,ber of families that used for CRISPys
+        n_singletons: number of families with no chips output because they had only singletons gRNAs
+        n_no_input: number of families with no chips output because there was no input gRNAs for chips
+
+    Returns:
+
+    """
+
+    filepath = f"{path}/{output_name}.csv"
+
+    f = open(filepath, 'w')
+    f.write(f"# CRISPys-Chips output. out of {n_families} families {n_singletons} had only singletons and {n_no_input}"
+            f" had no input for Chips and {families_with_no_output} with no chips/crispys output\n")
+
+    for bestgroup in bestgroup_dict.values():
+        # write the sequence of best guide
+        f.write(f"Group of:,{bestgroup.best_candidate.seq}\n")
+        # go over each pair (or more) of multiplex and write it to the file
+        for subgroup in bestgroup.subgroups:
+            sub_tree_display(subgroup.candidates_list, f)
+        f.write("\n")
+    f.close()
 
 if __name__ == "__main__":
     tree_display("/groups/itay_mayrose/galhyams/1516893877")

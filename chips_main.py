@@ -699,7 +699,7 @@ def chips_main(crispys_output_path: str = None,
     new_subgroups_lst = add_singletons_to_subgroup(list_of_subgroup_no_offtargets, number_of_singletons)
     # Stop if the list is empty
     if not new_subgroups_lst:
-        print("No input for Chips")
+        print("No input for Chips\n")
         quit()
 ##### start Chips ####################################################################################################
     global pos_dict
