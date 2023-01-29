@@ -75,5 +75,5 @@ def run(code_path: str, main_folder_path: str, crispys_name: str = "crispys_outp
 if __name__ == '__main__':
     run(code_path="/groups/itay_mayrose/udiland/CRISPys_Chips",
          main_folder_path="/groups/itay_mayrose/udiland/crispys_chips_arabidopsis/families", ncpu=1, queue="itaym",
-         crispys_name="moff_0.15", chips_name="chips_moff0.15_2sg", n_mm=4, n_groups=20, n_best=5, n_grna=2, n_singletons=5,
-         scoring="moff", restriction_site="GGTCTC", minimum_sg=2)
+         crispys_name="moff_0.15", chips_name="chips_moff0.15_1sg", n_mm=4, n_groups=20, n_best=5, n_grna=2, n_singletons=5,
+         scoring="moff", restriction_site="GGTCTC", minimum_sg=1)

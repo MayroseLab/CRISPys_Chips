@@ -15,7 +15,7 @@ def get_final_multiplx_list(multiplx_dict: Dict, max_sg_per_gene=4) -> List:
     """
     # get list of all multiplx
     multiplx_lst = list(multiplx_dict.values())
-    # get a list of all genes targeted
+    # get a dictionary of all genes and the count of how many times they are tarheted (initiate at 0)
     all_genes = [list(can.genes_score_dict.keys()) for group in multiplx_lst for can in group.candidates_list]
     genes_sgcount_dict = {gene: 0 for genes in all_genes for gene in genes}
 
@@ -43,6 +43,9 @@ def get_final_multiplx_list(multiplx_dict: Dict, max_sg_per_gene=4) -> List:
             continue
         else:
             output_multiplx_list.append(multiplx)
+        # if all genes covered to the desire number of gRNA return the results
+        if all([gene_score >= max_sg_per_gene for gene_score in genes_sgcount_dict.values()]):
+            return output_multiplx_list
     return output_multiplx_list
 
 def update_genes_nsg_dict(multiplx, genes_sgcount_dict: Dict, max_sg_per_gene: int):
@@ -58,17 +61,14 @@ def update_genes_nsg_dict(multiplx, genes_sgcount_dict: Dict, max_sg_per_gene: i
     Returns:
         if the minimum has not been achieved, returns the multiplx otherwise return None
     """
-    # copy the current gene:n_guides dictionary
-    genes_scores = genes_sgcount_dict.copy()
-    # count the total number of guides per gene starting with the existing one and adding the current multiplex
-    for candidate in multiplx.candidates_list:
-        for gene in genes_sgcount_dict.keys():
-            if gene in candidate.genes_score_dict.keys():
-                genes_scores[gene] += 1
-    # check if all gene are above the maximum number of guide, if so return None
-    if all([score > max_sg_per_gene for score in genes_scores.values()]):
+    # get the genes that needs to be targeted (they have been targeted in previuos multiplex less than max_sg_per_gene)
+    genes2target = [gene for gene in genes_sgcount_dict.keys() if genes_sgcount_dict[gene] < max_sg_per_gene]
+    # create a list that will hold the genes that are targeted by current multiplex
+    genes_targeted = [gene for candidate in multiplx.candidates_list for gene in candidate.genes_score_dict.keys()]
+   # check if
+    if not [gene for gene in genes2target if gene in genes_targeted]:
         return
-    # if the maxumum has not been reached, add teh number tio the dictionary and return the multiplx
+    # if the maximum has not been reached, add the number of hits per gene to the dictionary and return the multiplx
     else:
         for candidate in multiplx.candidates_list:
             for gene in candidate.genes_score_dict.keys():
