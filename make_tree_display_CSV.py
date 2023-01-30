@@ -4,7 +4,7 @@ from typing import List, Dict
 
 
 def sub_tree_display(candidates_lst, f):
-    header_row = "sgRNA index,sgRNA,Score,Genes,Genes score,Target site,#mms,Position,Strand,PAM,Family, Off-targets\n"
+    header_row = "#sgRNA index,sgRNA,Score,Genes,Genes score,Target site,#mms,Position,Strand,PAM,Family, Off-targets\n"
 
     f.write(header_row)
     sgRNA_index = 0
@@ -224,7 +224,7 @@ def write_library_csv(path: str, bestgroup_dict: Dict, output_name: str, n_famil
 
     for bestgroup in bestgroup_dict.values():
         # write the sequence of best guide
-        f.write(f"Group of:,{bestgroup.best_candidate.seq}\n")
+        f.write(f"#Group of:,{bestgroup.best_candidate.seq}\n")
         # go over each pair (or more) of multiplex and write it to the file
         for subgroup in bestgroup.subgroups:
             sub_tree_display(subgroup.candidates_list, f)

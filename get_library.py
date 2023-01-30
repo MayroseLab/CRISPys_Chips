@@ -194,4 +194,4 @@ def collect_fam_res(main_families_path: str, chips_name: str, log_file: str, lib
     write_library_csv(library_output_path, final_res_dict, "Chips_library_output", len(crispys_families),
                       families_with_singletons, families_with_no_chips_input, families_with_no_output)
 
-collect_fam_res("/groups/itay_mayrose/udiland/crispys_chips_arabidopsis/families", "chips_moff0.15_1sg", "crispys_log.txt","/groups/itay_mayrose/udiland/crispys_chips_arabidopsis")
+collect_fam_res("/groups/itay_mayrose/udiland/crispys_chips_arabidopsis/families", "chips_moff0.15_4sg", "crispys_log.txt","/groups/itay_mayrose/udiland/crispys_chips_arabidopsis")
