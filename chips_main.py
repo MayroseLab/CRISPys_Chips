@@ -13,7 +13,7 @@ from make_tree_display_CSV import create_output_multiplex
 import Candidate
 from SubgroupRes import SubgroupRes
 from crunch_classes import CandidateWithOffTargets
-from select_grna_for_output import get_final_multiplx_list
+from select_grna_for_output import select_top_sg_in_node
 random.seed(42)
 
 """
@@ -621,7 +621,7 @@ def chips_main(crispys_output_path: str = None,
                number_of_singletons: int = 5,
                scoring_function: str = "moff",
                restriction_site: str = "None",
-               min_sg_per_gene: int = 4,
+               sg_per_node: int = 5,
                include_all_family_gene: bool = False):
     """
     This is the main function of crispys-chips, it read the result of crispys and apply on them the chips algorithm.
@@ -652,10 +652,7 @@ def chips_main(crispys_output_path: str = None,
         threads: number if cpu to use with crispritz
         number_of_singletons: how many singletons to add to each group of gRNAs of internal node
         scoring_function: the scoring function to use in off-target search
-        min_sg_per_gene: the minimum number of gRNA targeting each gene, for each group of genes, when all genes in the
-        internal node will pass this number no more gRNA will be written this group of genes.
-        include_all_family_gene: when filtering off-targets, if the off-target is in a gene belong to the main family
-        (before the split for crispys) dont filter it when this param is False.
+        sg_per_node: the number of gRNA to select from each subgroup of genes (internal node)
 
     Returns:
 
@@ -749,19 +746,20 @@ def chips_main(crispys_output_path: str = None,
         if bestsgroup_dict:
             output_dict[subgroup.name] = bestsgroup_dict
 
-    #add the canddiate object for each multiplex subgroupres object
+    #add the candiate object for each multiplex subgroupres object
     add_best_candidate_to_multiplx(output_dict)
     # filter duplicate multiplexs
     multiplx_dict = filter_duplicates_from_final_dict(output_dict)
     # get output by selecting minimum of n gRNA for each gene
-    final_list = get_final_multiplx_list(multiplx_dict, min_sg_per_gene)
+    final_dict = select_top_sg_in_node(multiplx_dict, sg_per_node)
+    # final_list = get_final_multiplx_list(multiplx_dict, min_sg_per_gene)
     # order the results back to dictionary of {"name":{best_seq: list_of_bestsggroups}}
-    final_output_dict = order_output_list(final_list)
+    # final_output_dict = order_output_list(final_list)
     # save results to pickle
     with open(f"{os.path.join(crispys_output_path, chips_output_name)}.p", 'wb') as f:
-        pickle.dump(final_output_dict, f)
+        pickle.dump(final_dict, f)
     # write results to csv file
-    create_output_multiplex(crispys_output_path, {"Chips_final_results":final_output_dict}, number_of_groups,
+    create_output_multiplex(crispys_output_path, final_dict, number_of_groups,
                             n_with_best_guide, n_sgrnas, chips_output_name)
 
 

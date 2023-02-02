@@ -1,6 +1,25 @@
 import copy
 from typing import List, Dict
 
+def recreate_subgroup_lst(list_of_candidates_filtered: List) -> List:
+    """
+    This function take a list of candidates (that passed off-targets filtering) and output a list os subgroupres objects
+    each contain the candidate of an internal node of the gene tree (the same structure of crispys output)
+    Args:
+        list_of_candidates_filtered: list of candidate objects
+
+    Returns:
+        list of SubgroupRes
+    """
+    subgroups_dict = {}
+    for candidate in list_of_candidates_filtered:
+        if tuple(candidate.subgroup.genes_in_node) not in subgroups_dict.keys():
+            subgroups_dict[tuple(candidate.subgroup.genes_in_node)] = [candidate]
+        else:
+            subgroups_dict[tuple(candidate.subgroup.genes_in_node)].append(candidate)
+    # make a list of subgroupRes objects
+    subgroup_lst = [SubgroupRes(list(genes), can_lst, can_lst[0].subgroup.name, list(genes)) for genes, can_lst in subgroups_dict.items()]
+    return subgroup_lst
 
 def get_final_multiplx_list(multiplx_dict: Dict, max_sg_per_gene=4) -> List:
     """
@@ -74,3 +93,29 @@ def update_genes_nsg_dict(multiplx, genes_sgcount_dict: Dict, max_sg_per_gene: i
             for gene in candidate.genes_score_dict.keys():
                 genes_sgcount_dict[gene] += 1
         return multiplx
+
+def select_top_sg_in_node(multiplx_dict: Dict, sg_per_node=4) -> List:
+    res_dict = {}
+    # create alist of all multiplexes
+    multiplx_lst = list(multiplx_dict.values())
+    # add score of all gRNAs in muktpilx
+    for multiplx in multiplx_lst:
+        total_score = 0
+        for can in multiplx.candidates_list:
+            total_score += can.cut_expectation
+        multiplx.total_score = total_score
+
+    # rearrange the multiplx to group genes in node
+    for multiplx in multiplx_lst:
+        if str(multiplx.genes_in_node) not in res_dict:
+            res_dict[str(multiplx.genes_in_node)] = [multiplx]
+        else:
+            res_dict[str(multiplx.genes_in_node)].append(multiplx)
+
+    # take n multiplx from each gene group
+    #sort multiplexes by total score
+    res_dict = {key:sorted(value, key=lambda x: x.total_score, reverse=True) for key,value in res_dict.items()}
+    # output results with the top multiplex as defined in the 'sg_per_node' variable
+    res_dict = {key:value[0:sg_per_node] for key, value in res_dict.items()}
+
+    return res_dict
