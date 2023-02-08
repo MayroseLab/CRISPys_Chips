@@ -13,7 +13,6 @@ from make_tree_display_CSV import create_output_multiplex
 import Candidate
 from SubgroupRes import SubgroupRes
 from crunch_classes import CandidateWithOffTargets
-from select_grna_for_output import select_top_sg_in_node
 random.seed(42)
 
 """
@@ -78,7 +77,7 @@ class BestSgGroup:
         return f"{self.best_candidate} , {self.subgroups}"
 
 
-def only_singletons(subgroup_list: List) -> bool:
+def check_for_singletons(subgroup_list: List):
     """
     This function check if crispys result contain only singletons
     and if so return True, otherwise return False
@@ -86,15 +85,45 @@ def only_singletons(subgroup_list: List) -> bool:
         subgroup_list: list of SubgroupRes
 
     Returns:
-            True or False depend if all results are of singletons
+            if some of the subgroup target more than one gene return False
+            if the results target only one gene return True
     """
-    only_singletons = True
+    # go over the results and if you find results for internal node (results for more than one gene) exit the function
     for subgroup in subgroup_list:
-        for candidate in subgroup.candidates_list:
-            if len(candidate.genes_score_dict.keys()) > 1:
-                only_singletons = False
-                return only_singletons
-    return only_singletons
+        if len(subgroup.genes_in_node) > 1:
+            if subgroup.candidates_list:
+                return subgroup_list
+
+    # if the results are only singletons check how many genes in the results and if only one gene targeted exit the program
+    number_of_genes_covered = len(set([str(candidate.genes_score_dict.keys()) for subgroup in subgroup_list for candidate in subgroup.candidates_list]))
+    if number_of_genes_covered == 1:
+        print(f"Only one gene targeted in {subgroup_list[0].family_name}")
+        exit()
+
+    # if the results are of multiple singletons only create subgroups that
+    # create a dictionary of gene:list_pf_candidates
+    singletones_dict = {subgroup.genes_in_node[0]:subgroup.candidates_list for subgroup in subgroup_list if subgroup.candidates_list}
+    # use the dictionary to create candidates lists for each internal node
+    # first sort singletons by on target score
+    singletones_dict = {key:sorted(value, key=lambda x: x.on_target_score, reverse=True) for key,value in singletones_dict.items()}
+    for subgroup in subgroup_list:
+        if not subgroup.candidates_list:
+            for gene in subgroup.genes_in_node:
+                try:
+                    subgroup.candidates_list += singletones_dict[gene]
+                except KeyError:
+                    continue
+    # return the list of subgroups with only internal nodes that have more than one gene
+    new_subgroup_list = []
+    for subgroup in subgroup_list:
+        # count gene in subgroupres
+        genes_covered = len(set([str(candidate.genes_score_dict.keys()) for candidate in subgroup.candidates_list]))
+        if genes_covered > 1:
+            new_subgroup_list.append(subgroup)
+
+    return new_subgroup_list
+
+
 
 
 def add_singletons_to_subgroup(subgroup_list: list, number_of_singletons: int = 5) -> list:
@@ -123,10 +152,10 @@ def add_singletons_to_subgroup(subgroup_list: list, number_of_singletons: int = 
     singletons_dict = {k: sorted(v, key=lambda x: x.on_target_score, reverse=True) for k, v in singletons_dict.items()}
 
     # go over the list of subgroups with no singletons and add the singleton candidate if it is not exists
-    # the number of sinbgletones to add for each gene is define in the 'number_of_singltones' variable
+    # the number of singletons to add for each gene is defined in the 'number_of_singltones' variable
     for subgroup in subgroup_list_no_singles:
         singletons2add = []
-        # make a list of candidates sequences from the nun-singletons subgroup
+        # make a list of candidates sequences from the no-singletons subgroup
         subgroup_cand_seqs = [can.seq for can in subgroup.candidates_list]
         # go over the singletons dictionary and check if the singleton target a gene of the subgroup
         for single_gene in singletons_dict.keys():
@@ -572,37 +601,40 @@ def filter_duplicates_from_final_dict(res_dict: Dict) -> Dict:
     return multiplx_dict
 
 
-def order_output_list(final_list: List) -> Dict:
+def select_top_sg_in_node(multiplx_dict: Dict, sg_per_node=4) -> Dict:
     """
-    This function get a list of subgroupres objects (multiplex) and output a dictionary of {best_seq:BestSgGroup}
-    while each BestSgGroup holds all multiplexes with the same 'Best' gRNA, It will be used later to create an output
+
     Args:
-        final_list: list of SubGroupRes
+        multiplx_dict:
+        sg_per_node:
 
     Returns:
-        dictionary of {best_seq:BestSgGroup}
-    """
-    # first make a dictionary of best_seq:list of multiplx
-    best_seq_candidates_dict = {}
-    for subgroup in final_list:
-        for candidate in subgroup.candidates_list:
-            if candidate.best_candidate.seq not in best_seq_candidates_dict:
-                best_seq_candidates_dict[candidate.best_candidate.seq] = [subgroup]
-            else:
-                if subgroup not in best_seq_candidates_dict[candidate.best_candidate.seq]:
-                    best_seq_candidates_dict[candidate.best_candidate.seq].append(subgroup)
-            # take the chance to sort the off-target list by score
-            sorted(candidate.off_targets_list, key=lambda x: x.score, reverse=True)
 
-    # take the list of multiplx per 'Best' gRNA from the best_seq_candidates_dict dictionary and create an object of
-    # BestSgGroup for each one of them in a new best_seq:BesSgGroup dictionary
-    best_seq_bestsggroup_dict = {}
-    for best_seq in best_seq_candidates_dict.keys():
-        best_seq_bestsggroup_dict[best_seq] = BestSgGroup(best_seq_candidates_dict[best_seq][0].candidates_list[0].best_candidate,
-                                                          best_seq_candidates_dict[best_seq],
-                                                          [cand for subgroup in best_seq_candidates_dict[best_seq] for cand in subgroup.candidates_list]
-                                                          )
-    return best_seq_bestsggroup_dict
+    """
+    res_dict = {}
+    # create alist of all multiplexes
+    multiplx_lst = list(multiplx_dict.values())
+    # add score of all gRNAs in muktpilx
+    for multiplx in multiplx_lst:
+        total_score = 0
+        for can in multiplx.candidates_list:
+            total_score += can.cut_expectation
+        multiplx.total_score = total_score
+
+    # rearrange the multiplx to group genes in node
+    for multiplx in multiplx_lst:
+        if str(multiplx.genes_in_node) not in res_dict:
+            res_dict[str(multiplx.genes_in_node)] = [multiplx]
+        else:
+            res_dict[str(multiplx.genes_in_node)].append(multiplx)
+
+    # take n multiplx from each gene group
+    #sort multiplexes by total score
+    res_dict = {key:sorted(value, key=lambda x: x.total_score, reverse=True) for key,value in res_dict.items()}
+    # output results with the top multiplex as defined in the 'sg_per_node' variable
+    res_dict = {key:value[0:sg_per_node] for key, value in res_dict.items()}
+
+    return res_dict
 
 
 def chips_main(crispys_output_path: str = None,
@@ -662,10 +694,8 @@ def chips_main(crispys_output_path: str = None,
     pickle_name = [file for file in os.listdir(crispys_output_path) if file.endswith(f"{crispys_output_name}.p")][0]
     pickle_file = os.path.join(crispys_output_path, pickle_name)
     list_of_subgroup_results = pickle.load(open(pickle_file, 'rb'))
-    # Check that the results has internal node (not only singletons)
-    if only_singletons(list_of_subgroup_results):
-        print(f"Only singletons in {pickle_name}")
-        exit()
+    # Check if the results has internal node
+    list_of_subgroup_results = check_for_singletons(list_of_subgroup_results)
     # Convert the list of internal node results into a list of CandidateWithOffTargets object.
     list_of_candidates = concat_candidates_from_subgroups(list_of_subgroup_results)
     # remove restriction site
@@ -694,6 +724,11 @@ def chips_main(crispys_output_path: str = None,
     list_of_subgroup_no_offtargets = recreate_subgroup_lst(list_of_candidates_filtered)
     # insert singleton subgroup to subgroups without singleton and create a list of subgroups without sinlgetons
     new_subgroups_lst = add_singletons_to_subgroup(list_of_subgroup_no_offtargets, number_of_singletons)
+    # dict1 = {can.seq:can for can in list_of_subgroup_no_offtargets[0].candidates_list if
+    #        "AT4G08300" in can.genes_score_dict.keys()}
+    # dict2 = {can.seq: can for can in list_of_subgroup_no_offtargets[1].candidates_list if
+    #          "AT4G08300" in can.genes_score_dict.keys()}
+    # lst = [dict1[seq] for seq in dict1.keys() if seq not in dict2.keys()]
     # Stop if the list is empty
     if not new_subgroups_lst:
         print("No input for Chips\n")
@@ -703,7 +738,7 @@ def chips_main(crispys_output_path: str = None,
     global guide_seq_dict
     output_dict = {}
     # sort the subgroup list according the number of genes in node (from low to high)
-    new_subgroups_lst.sort(key=lambda x: len(x.genes_in_node))
+    new_subgroups_lst.sort(key=lambda x: len(x.genes_in_node), reverse=True)
     # go over each group of results (for each internal node in gene tree)
     for subgroup in new_subgroups_lst:
         subgroup_dict = subgroup2dict(subgroup)
@@ -752,9 +787,7 @@ def chips_main(crispys_output_path: str = None,
     multiplx_dict = filter_duplicates_from_final_dict(output_dict)
     # get output by selecting minimum of n gRNA for each gene
     final_dict = select_top_sg_in_node(multiplx_dict, sg_per_node)
-    # final_list = get_final_multiplx_list(multiplx_dict, min_sg_per_gene)
-    # order the results back to dictionary of {"name":{best_seq: list_of_bestsggroups}}
-    # final_output_dict = order_output_list(final_list)
+
     # save results to pickle
     with open(f"{os.path.join(crispys_output_path, chips_output_name)}.p", 'wb') as f:
         pickle.dump(final_dict, f)
@@ -822,7 +855,7 @@ def parse_arguments(parser_obj: argparse.ArgumentParser):
     parser_obj.add_argument('--restriction_site', '-restriction', type=str,
                          help='The sequence of restriction site')
 
-    parser_obj.add_argument('--min_sg_per_gene', '-min_sg', type=int, help="The minimum number of gRNAs for any gene",
+    parser_obj.add_argument('--sg_per_node', '-node_sg', type=int, help="The minimum number of gRNAs for any gene",
                          default=4)
 
     arguments = parser_obj.parse_args()
@@ -848,4 +881,4 @@ if __name__ == "__main__":
                threads=args.threads,
                number_of_singletons=args.number_of_singletons,
                scoring_function=args.scoring_function,
-               min_sg_per_gene=args.min_sg_per_gene)
+               sg_per_node=args.sg_per_node)
