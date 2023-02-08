@@ -146,7 +146,7 @@ def tree_display(path: str, subgroups_lst: list,
     f.close()
 
 
-def create_output_multiplex(path: str, multiplex_dict: Dict, number_of_groups: int,
+def create_output_multiplex_from_bestgroup(path: str, multiplex_dict: Dict, number_of_groups: int,
                             n_with_best_guide: int, n_sgrnas: int, output_name: str):
 
     """
@@ -230,6 +230,41 @@ def write_library_csv(path: str, bestgroup_dict: Dict, output_name: str, n_famil
             sub_tree_display(subgroup.candidates_list, f)
         f.write("\n")
     f.close()
+
+
+def create_output_multiplex(path: str, chips_res_dict: Dict, number_of_groups: int,
+                            n_with_best_guide: int, n_sgrnas: int, output_name: str):
+
+    """
+    This function is used to write the output of multiplex
+    Args:
+        path: path to output folder
+        crispys_res: the 'traditional' crispys output (list of subGroupRes)
+        multiplex_dict: the output of crispys-chips. a dictionary of node_name:dictionary of best_sg_seq:BestSgGroup
+        output_name:
+    Returns:
+
+    """
+
+    filepath = f"{path}/{output_name}.csv"
+
+    f = open(filepath, 'w')
+    f.write(f"Off-target filtered results of multiplex run with {number_of_groups} 'Best' groups each one with {n_with_best_guide} "
+            f"gRNA and {n_sgrnas} in each multiplex\n")
+    # go over each internal node
+    for node in chips_res_dict:
+        f.write(f"Node:,{node}\n")
+        # get node genes
+        # genes_set = get_genes_of_nodes(multiplex_dict, node)
+        # # write the node name
+        # f.write(f"genes in node:,{str(multiplex_dict[node][list(multiplex_dict[node].keys())[0]].subgroups[0].genes_in_node).strip('[]')}\n")
+        # f.write(f"genes captured:,{str(genes_set).strip('{}')}\n")
+        # go over each 'best guide' group
+        for subgroup in chips_res_dict[node]:
+                sub_tree_display(subgroup.candidates_list, f)
+        f.write("\n")
+    f.close()
+
 
 if __name__ == "__main__":
     tree_display("/groups/itay_mayrose/galhyams/1516893877")
