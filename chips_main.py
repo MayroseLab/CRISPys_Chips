@@ -856,7 +856,7 @@ def parse_arguments(parser_obj: argparse.ArgumentParser):
                          help='The sequence of restriction site')
 
     parser_obj.add_argument('--sg_per_node', '-node_sg', type=int, help="The minimum number of gRNAs for any gene",
-                         default=4)
+                         default=5)
 
     arguments = parser_obj.parse_args()
     return arguments
