@@ -61,15 +61,15 @@ def check_chips_input(family_path: str):
 
 def check_duplicates(res_dict: Dict):
     subgroup_dict = {}
-    for bestgroup in res_dict.values():
-        for subgroup in bestgroup.subgroups:
+    for subgroups_list in res_dict.values():
+        for subgroup in subgroups_list:
             seqs = tuple([can.seq for can in subgroup.candidates_list])
             if seqs not in subgroup_dict:
                 subgroup_dict[seqs] = subgroup
             else:
                 print("Du Du Duplicate!")
 
-def write_guides_per_gene(res_dict: Dict, library_output_path: str) -> Dict:
+def write_guides_per_gene(res_dict: Dict, library_output_path: str, library_name: str) -> Dict:
     """
     This function calculate the number of guides targeting each gene and write it to a dictionary of
     gene:number of guides, it than write ti to a pickle file
@@ -81,8 +81,8 @@ def write_guides_per_gene(res_dict: Dict, library_output_path: str) -> Dict:
 
     """
     gene_nguides_dict = {}
-    for bestgroup in res_dict.values():
-        for subgroup in bestgroup.subgroups:
+    for subgroups_list in res_dict.values():
+        for subgroup in subgroups_list:
             for cand in subgroup.candidates_list:
                 genes = cand.genes_score_dict.keys()
                 for gene in genes:
@@ -91,13 +91,13 @@ def write_guides_per_gene(res_dict: Dict, library_output_path: str) -> Dict:
                     else:
                         gene_nguides_dict[gene] += 1
     # write the dictionary to file
-    with open(f"{os.path.join(library_output_path, 'guides_per_gene.p')}", "wb") as f:
+    with open(f"{os.path.join(library_output_path, library_name + '_guides_per_gene.p')}", "wb") as f:
         pickle.dump(gene_nguides_dict, f)
 
-def write_ngenes_targeted_per_guide(res_dict, library_output_path):
+def write_ngenes_targeted_per_guide(res_dict: Dict, library_output_path: str, library_name: str):
     guide_ngenes_dict = {}
-    for bestgroup in res_dict.values():
-        for subgroup in bestgroup.subgroups:
+    for subgroups_list in res_dict.values():
+        for subgroup in subgroups_list:
             for cand in subgroup.candidates_list:
                 genes = tuple(cand.genes_score_dict)
                 if cand.seq not in guide_ngenes_dict:
@@ -107,13 +107,13 @@ def write_ngenes_targeted_per_guide(res_dict, library_output_path):
 
     guide_ngens = {guide:len(set(genes)) for guide, genes in guide_ngenes_dict.items()}
     # write the dictionary to file
-    with open(f"{os.path.join(library_output_path, 'genes_per_guide.p')}", "wb") as f:
+    with open(f"{os.path.join(library_output_path, library_name + '_genes_per_guide.p')}", "wb") as f:
         pickle.dump(guide_ngens, f)
 
-def write_ngenes_targeted_per_multiplx(res_dict, library_output_path):
+def write_ngenes_targeted_per_multiplx(res_dict, library_output_path, library_name):
     multplx_ngenes_dict = {}
-    for bestgroup in res_dict.values():
-        for subgroup in bestgroup.subgroups:
+    for subgroups_list in res_dict.values():
+        for subgroup in subgroups_list:
             n_genes = 0
             for cand in subgroup.candidates_list:
                 n_genes += len(cand.genes_score_dict)
@@ -121,12 +121,12 @@ def write_ngenes_targeted_per_multiplx(res_dict, library_output_path):
             seqs = tuple([can.seq for can in subgroup.candidates_list])
             multplx_ngenes_dict[seqs] = n_genes
     # write the dictionary to file
-    with open(f"{os.path.join(library_output_path, 'genes_per_multiplex.p')}", "wb") as f:
+    with open(f"{os.path.join(library_output_path, library_name + '_genes_per_multiplex.p')}", "wb") as f:
         pickle.dump(multplx_ngenes_dict, f)
 
 
 
-def collect_fam_res(main_families_path: str, chips_name: str, log_file: str, library_output_path: str):
+def collect_fam_res(main_families_path: str, chips_name: str, log_file: str, library_output_path: str, library_name: str):
     """
     The main function that create the Chips gRNA library out of all families outputs
     Args:
@@ -171,6 +171,12 @@ def collect_fam_res(main_families_path: str, chips_name: str, log_file: str, lib
                 else:
                     families_with_no_output += 1
                     print(f"No Chips output for {family}\n")
+                    # read and print the job output file
+                    files = os.listdir(family_path)
+                    output = str([file for file in files if file.endswith("chips.OU")][0])
+                    with open(os.path.join(family_path, output), 'r') as f:
+                        msg = f.read()
+                        print(msg)
                     continue
 
         for best_seq in fam_res_dict:
@@ -180,18 +186,19 @@ def collect_fam_res(main_families_path: str, chips_name: str, log_file: str, lib
                 # print(f"Same 'Best' seq in {family}\n")
                 final_res_dict[best_seq].subgroups.extend(fam_res_dict[best_seq].subgroups)
     #print number of multpilx
-    n_multiplx = sum([len(best.subgroups) for best in final_res_dict.values()])
-    print(f"Total number of multiplexes is {n_multiplx} with {2*n_multiplx} guides")
+    n_multiplx = sum([len(subgroups) for subgroups in final_res_dict.values()])
+    print(f"Total number of multiplexes in {library_name} is {n_multiplx} with {2*n_multiplx} guides")
 
     check_duplicates(final_res_dict)
     # report the number of guides per gene
-    write_guides_per_gene(final_res_dict, library_output_path)
+    write_guides_per_gene(final_res_dict, library_output_path, library_name)
     # report the number of genes targeted by each guide
-    write_ngenes_targeted_per_guide(final_res_dict, library_output_path)
+    write_ngenes_targeted_per_guide(final_res_dict, library_output_path,library_name)
     # report the number of genes targeted by each multiplex
-    write_ngenes_targeted_per_multiplx(final_res_dict, library_output_path)
+    write_ngenes_targeted_per_multiplx(final_res_dict, library_output_path, library_name)
     # write to csv
-    write_library_csv(library_output_path, final_res_dict, "Chips_library_output", len(crispys_families),
+    write_library_csv(library_output_path, final_res_dict, library_name + "_Chips_library_output", len(crispys_families),
                       families_with_singletons, families_with_no_chips_input, families_with_no_output)
 
-collect_fam_res("/groups/itay_mayrose/udiland/crispys_chips_arabidopsis/families", "chips_moff0.15_4sg", "crispys_log.txt","/groups/itay_mayrose/udiland/crispys_chips_arabidopsis")
+collect_fam_res("/groups/itay_mayrose/udiland/crispys_chips_arabidopsis/families", "chips_moff0.15_3sg",
+                "crispys_log.txt","/groups/itay_mayrose/udiland/crispys_chips_arabidopsis", "moff_0.15_3sg_old")

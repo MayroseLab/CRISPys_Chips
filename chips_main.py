@@ -21,9 +21,9 @@ maximum number of the genes in a group of genes (internal node).
 It will first select the 'best' guide, that is, the one that will target the most genes with maximum expectation score, 
 than, it will select another guide that will complement the target to capture more genes that are not capture with the 
 previous guide, this will continue until we get the number of guide we specify (usually the multiplex is of 2 guides).
-Next, this peocess will repeat but without selecting the 'additional' guides, meaning, it will keep the first ('best') 
-guide and remove from the list of all guides that completed the multiplex in previus step, and will find new ones to add to the 'bset' guide. 
-the 'best' one, this argument is controled with the 'n_with_best_guide' parameter.
+Next, this process will repeat but without selecting the 'additional' guides, meaning, it will keep the first ('best') 
+guide and remove from the list of all guides that completed the multiplex in previous step, and will find new ones to add to the 'bset' guide. 
+the 'best' one, this argument is controlled with the 'n_multiplx' parameter.
 each multiplex (list of guides for one vector) is stored in a SubgroupRes object and a group of them are stored in a BestSgGroup object.
 A representation of the BestSgGroup:
 
@@ -67,14 +67,16 @@ class BestSgGroup:
      called BestSgGroup and the 'best_candidate' attribute will store the sequence of the best candidate.
     """
 
-    def __init__(self, best_candidate: Candidate.Candidate = None, subgroups: List = list(),
-                 all_candidates: List = list()):
+    def __init__(self, best_candidate: Candidate.Candidate = None, subgroups_list: List = None,
+                 all_candidates=None):
+        if all_candidates is None:
+            all_candidates = list()
         self.best_candidate = best_candidate
-        self.subgroups = subgroups
+        self.subgroups_list = subgroups_list
         self.all_candidates = all_candidates
 
     def __str__(self):
-        return f"{self.best_candidate} , {self.subgroups}"
+        return f"{self.best_candidate} , {self.subgroups_list}"
 
 
 def check_for_singletons(subgroup_list: List):
@@ -234,95 +236,63 @@ def recreate_subgroup_lst(list_of_candidates_filtered: List) -> List:
     subgroup_lst = [SubgroupRes(list(genes), can_lst, can_lst[0].subgroup.name, list(genes)) for genes, can_lst in subgroups_dict.items()]
     return subgroup_lst
 
-def subgroup2dict(subgroup: SubgroupRes) -> Dict:
+
+# def subgroup2dict(subgroup: SubgroupRes) -> Dict:
+#     """
+#     This function take a subgroup object and output a dictionary of sequence:candidate
+#     Args:
+#         subgroup: subgroups objects
+#
+#     Returns: a dictionary of candidates
+#     """
+#     candidates_dict = {}
+#     for candidate in subgroup.candidates_list:
+#         # if the candidate is in the dictionary replace it with the same one that have higher cut expectation (if exist)
+#         if candidate.seq not in candidates_dict or candidate.cut_expectation > candidates_dict[candidate.seq].cut_expectation:
+#             candidates_dict[candidate.seq] = candidate
+#     return candidates_dict
+
+
+def select_secondary(primery_grna, candidates_list):
     """
-    This function take a subgroup object and output a dictionary of sequence:candidate
+
     Args:
-        subgroup: subgroups objects
-
-    Returns: a dictionary of candidates
-    """
-    candidates_dict = {}
-    for candidate in subgroup.candidates_list:
-        # if the candidate is in the dictionary replace it with the same one that have higher cut expectation (if exist)
-        if candidate.seq not in candidates_dict or candidate.cut_expectation > candidates_dict[candidate.seq].cut_expectation:
-            candidates_dict[candidate.seq] = candidate
-    return candidates_dict
-
-def subgroup2dict(subgroup: SubgroupRes) -> Dict:
-    """
-    This function take a subgroup object and output a dictionary of sequence:candidate
-    Args:
-        subgroup: subgroups objects
-
-    Returns: a dictionary of candidates
-    """
-    candidates_dict = {}
-    for candidate in subgroup.candidates_list:
-        # if the candidate is in the dictionary replace it with the same one that have higher cut expectation (if exist)
-        if candidate.seq not in candidates_dict or candidate.cut_expectation > candidates_dict[candidate.seq].cut_expectation:
-            candidates_dict[candidate.seq] = candidate
-    return candidates_dict
-
-def recalc_coef_dict(candidate: Candidate, coef_dict: Dict, delta: int = 0.9):
-    """
-    This function update the coefficients in the gene:coef dictionary based on the scores of the genes in a candidate
-    it reduce the existing coefficient value with the multiplication of it with the score of the gene from a given candidate (times some delta factor that prevent it to be zero)
-    Args:
-        candidate: a 'best candidate' that was selected in previous execution of 'select_candidate'
-        coef_dict: the existing coefficients dictionary
-        delta: a factor close to 1 that is used to prevent the coefficient to be zero
-
-    Returns: it changes the existing coefficient dictionary
-
-    """
-    for gene in coef_dict:
-        try:
-            coef_dict[gene] = coef_dict[gene] * (1 - (delta * candidate.genes_score_dict[gene]))
-        except KeyError:
-            continue
-
-def get_relative_score(candidate: Candidate, coef_dict: Dict) -> float:
-    """
-    This function calculate the score of a candidate after recalibration of each gene score with a coefficient,
-    the coefficient is coming from a dictionary of gene:coefficient
-    Args:
-        candidate: A candidate object
-        coef_dict: a dictionary of gene:soefficient
-
-    Returns: returns the score of a candidate considering the weight of each gene
-
-    """
-    score_total = 0
-    for gene in coef_dict:
-        try:
-            score_total += (coef_dict[gene] * candidate.genes_score_dict[gene])
-        # if the gene is not in the candidate dict go to the next gene
-        except KeyError:
-            continue
-    return score_total
-
-def select_candidate(candidates_dict: Dict, genes_coef_dict: Dict) -> Candidate:
-    """
-    This function take a dictionary of candidates and go over each one and calculates its score using a dictionary of
-     coefficient for each gene score that determine the weight of each gene in the final score.
-    It return the candidate that got the highest score
-    Args:
-        candidates_dict: a dictionary of seq:candidate
-        genes_coef_dict: a dictionary of gene:coefficient
+        primery_grna:
+        candidates_list:
 
     Returns:
-        The candidate with the best score
+
     """
-    # get the candidate with the best score
-    high_score = 0
-    best_candidate = None
-    for candidate in candidates_dict.values():
-        score = get_relative_score(candidate, genes_coef_dict)
-        if score > high_score:
-            best_candidate = candidate
-            high_score = score
-    return best_candidate
+    # get all genes in node
+    genes = primery_grna.subgroup.genes_in_node
+    max_cut_probability = 0
+    chosen_grna = None
+    # go over every gRNA and calculate its probability to cut all the gene of in node together with the primary gRNA
+    # and return the secondary gRNA that has the highest probability
+    for grna in candidates_list:
+        current_grna_prob = 0
+        for gene in genes:
+            current_grna_prob += get_gene_score(primery_grna, grna, gene)
+        if current_grna_prob > max_cut_probability:
+            max_cut_probability = current_grna_prob
+            chosen_grna = grna
+    if max_cut_probability == 0:
+        return
+    return chosen_grna
+
+def get_gene_score(primary_grna, grna, gene):
+    """
+
+    Args:
+        primary_grna:
+        grna:
+        gene:
+
+    Returns:
+
+    """
+    score = 1 - ((1 - primary_grna.genes_score_dict.get(gene, 0))*(1 - grna.genes_score_dict.get(gene, 0)))
+    return score
 
 def check_overlap_positions(candidate: Candidate, can_pos_dict=None):
     """
@@ -345,14 +315,14 @@ def check_overlap_positions(candidate: Candidate, can_pos_dict=None):
         return can_pos_dict
 
     if can_pos_dict:
-        for can in can_pos_dict.keys():
+        for can_seq in can_pos_dict.keys():
             overlaps = []
             for gene in candidate.targets_dict:
                 # get candidate positions
                 target = candidate.targets_dict[gene]
                 can_pos_set = {(target[0][3], target[0][4])}
                 try:
-                    if can_pos_dict[can][gene] == can_pos_set:
+                    if can_pos_dict[can_seq][gene] == can_pos_set:
                         overlaps.append(True)
                     else:
                         overlaps.append(False)
@@ -405,7 +375,7 @@ def check_duplicates(selected_cand_dict: dict, guide_seq_dict: Dict=dict()):
             return True
         else:
             return False
-    # if the multiplex hasnt been called add its sequences and gene count to the dictionary
+    # if the multiplex hasn't been called add its sequences and gene count to the dictionary
     guide_seq_dict[tuple(multiplx_seqs)[0]] = sum([len(guide.targets_dict.keys()) for guide in selected_cand_dict.values()])
     return False
 
@@ -429,52 +399,46 @@ def choose_multiplx(subgroup: SubgroupRes, n_sgrnas: int = 2, best_candidate: Ca
     Returns: subgroup object containing a list of candidates, Candidate object containing the 'best candidate'
 
     """
-
-    # get gene names for the family/node
-    genes_names = subgroup.genes_in_node
     # make a dictionary of seq:candidate from crispys results
-    candidates_dict = subgroup2dict(subgroup)
-    # create initial coefficient dictionary of gene:coef (with coef = 1)
-    genes_coef_dict = {gene: coef for gene, coef in zip(genes_names, [1 for i in genes_names])}
+    # candidates_dict = subgroup2dict(subgroup)
+
     # initate a dict that will store the gRNAs selected
     selected_candidates = {}
 
-    # select best guide according to the initial 'genes_coef_dict'
+    # select best guide according to the cut_expectation score
     if not best_candidate:
-        if len(candidates_dict) == 1:
+        if len(subgroup.candidates_list) == 1:
             return None
-        best_candidate = select_candidate(candidates_dict, genes_coef_dict)
+        best_candidate = sorted(subgroup.candidates_list, key=lambda x: x.cut_expectation, reverse=True)[0]
         # calculate the guide position
         pos_dict = check_overlap_positions(best_candidate)
+        # remove the best candidate from the subgroup
+        subgroup.candidates_list.remove(best_candidate)
     # store the selected 'best' guide in a dictionary
     selected_candidates[best_candidate.seq] = best_candidate
-    # re-calculate the coefficients dictionary according to the 'best' guide you found
-    recalc_coef_dict(best_candidate, genes_coef_dict)
 
     # select the rest (other than the best) of the candidates for the amount specified in n_sgrnas
     i = 1
     while i < n_sgrnas:
         # check if no candidates left
-        if not candidates_dict:
+        if not subgroup.candidates_list:
             return None
-        # select
-        candidate = select_candidate(candidates_dict, genes_coef_dict)
+        # select the secondery gRNAs
+        candidate = select_secondary(best_candidate, subgroup.candidates_list)
         # calculate the guide position
         skip_candidate = check_overlap_positions(candidate, pos_dict)
 
         if skip_candidate:
-            del (candidates_dict[candidate.seq])
+            subgroup.candidates_list.remove(candidate)
             continue
 
         # store the selected guide in a dictionary
         selected_candidates[candidate.seq] = candidate
-        # re-calculate the coefficients dictionary according to the guide you found
-        recalc_coef_dict(candidate, genes_coef_dict)
 
         # catch the end of the iteration to check if the multiplex is duplicate
         if (i == (n_sgrnas - 1)):
             if check_duplicates(selected_candidates):
-                del (candidates_dict[candidate.seq])
+                # del (candidates_dict[candidate.seq])
                 del (selected_candidates[candidate.seq])
                 continue
 
@@ -491,17 +455,17 @@ def choose_multiplx(subgroup: SubgroupRes, n_sgrnas: int = 2, best_candidate: Ca
     return subgroup, best_candidate, pos_dict
 
 
-def get_best_groups(subgroup: SubgroupRes, m_groups: int, n_sgrnas: int = 2):
+def get_best_groups(subgroup: SubgroupRes, n_multiplx: int, n_sgrnas: int = 2):
     """
-    This function takes crispys output as SubgroupRes object and finds m_groups of n_sgrnas.
+    This function takes crispys output as SubgroupRes object and finds n_multiplx of n_sgrnas.
     It is used for multiplexing while the n_sgrnas is the amount of guides in a single plasmid (the multiplex) and
-    the m_groups is the number of groups of sg with the same 'best candidate' to return
+    the n_multiplx is the number of groups of sg with the same 'best candidate' to return
     The algorithm takes the best sgRNA and match it with different guides to create m_group of multiplex each one with n_sgrnas guides.
     It returns a BestSgGroup object with the attribute 'subgroups' that store a list of subgroups the length of m_groups,
      each subgroup is a SubgroupRes object with n_sgrnas as the amount of candidates in its candidates_list
     Args:
         subgroup: SubgrouRes object
-        m_groups: number of groups of guides (the number of BestSgGroups to create)
+        n_multiplx: number of groups of guides (the number of BestSgGroups to create)
         n_sgrnas: number of guides in each group (for multiplexing)
 
     Returns:
@@ -520,12 +484,12 @@ def get_best_groups(subgroup: SubgroupRes, m_groups: int, n_sgrnas: int = 2):
     # save the result to a BestSgGroup object, this object is design to hold all multiplex of the same 'best' sgRNA
     current_best = BestSgGroup()
     # store the subgroupres object with the candidates
-    current_best.subgroups = [first_multiplex[0]]
+    current_best.subgroups_list = [first_multiplex[0]]
     # add the 'best' and the postion
     current_best.best_candidate, pos_dict = first_multiplex[1], first_multiplex[2]
     # store a list of all candidates
-    current_best.all_candidates = copy.copy(current_best.subgroups[0].candidates_list)
-    while m_groups > 1:
+    current_best.all_candidates = copy.copy(current_best.subgroups_list[0].candidates_list)
+    while n_multiplx > 1:
         # remove the found sg from the subgroup (recreate it without them)
         subgroup_temp.candidates_list = [can for can in subgroup_temp.candidates_list if
                                          can not in current_best.all_candidates]
@@ -538,10 +502,10 @@ def get_best_groups(subgroup: SubgroupRes, m_groups: int, n_sgrnas: int = 2):
             multiplx_group, best_candidate, pos_dict = choose_multiplx(subgroup_temp, n_sgrnas,
                                                                         current_best.best_candidate, pos_dict)
             # add the SubgrouRes object containing the list of guides to the results
-            current_best.subgroups.append(multiplx_group)
+            current_best.subgroups_list.append(multiplx_group)
             current_best.all_candidates += [can for can in multiplx_group.candidates_list if
                                             can not in current_best.all_candidates]
-            m_groups -= 1
+            n_multiplx -= 1
         except TypeError:
             # print(f"No more candidate in group {current_best.best_candidate.seq} in node {subgroup_temp.name}")
             return current_best
@@ -560,7 +524,7 @@ def add_best_candidate_to_multiplx(output_dict):
     """
     for node in output_dict.keys():
         for bestgroup in output_dict[node].values():
-            for multiplx in bestgroup.subgroups:
+            for multiplx in bestgroup.subgroups_list:
                 for cand in multiplx.candidates_list:
                     cand.best_candidate = bestgroup.best_candidate
 
@@ -582,7 +546,7 @@ def filter_duplicates_from_final_dict(res_dict: Dict) -> Dict:
     # go over the dictionary on nodes and collect the multiplx by there sequence to a new output dict
     for node in res_dict.keys():
         for bestgroup in res_dict[node].values():
-            for multiplx in bestgroup.subgroups:
+            for multiplx in bestgroup.subgroups_list:
                 # get the sequences of the gRNAs in the multiplx
                 multi_seqs = tuple(sorted([can.seq for can in multiplx.candidates_list]))
                 # get the number of genes targeted by the gRNAs
@@ -605,10 +569,10 @@ def select_top_sg_in_node(multiplx_dict: Dict, sg_per_node=4) -> Dict:
     """
 
     Args:
-        multiplx_dict:
-        sg_per_node:
+        multiplx_dict: dictionary of multiplxes
+        sg_per_node: the number of top gRNAs to select from each internal node
 
-    Returns:
+    Returns: final dictionary results with n best gRNAs per internal node
 
     """
     res_dict = {}
@@ -647,7 +611,7 @@ def chips_main(crispys_output_path: str = None,
                lower_intersect_limit: int = 10,
                upper_intersect_limit: int = 20,
                number_of_groups: int = 20,
-               n_with_best_guide: int = 5,
+               n_multiplx: int = 5,
                n_sgrnas: int = 2,
                threads: int = 1,
                number_of_singletons: int = 5,
@@ -663,7 +627,7 @@ def chips_main(crispys_output_path: str = None,
     capture the most genes and than to add to it gRNAs the capture genes not targeted by the 'Best' gRNA.
     For example, when n=2 and the family has 4 genes we first select gRNA that capture the most genes in the family,
     lets say that our 'Best' gRNA captured g1, g2 and g3 than we will look for another gRNA (secondary) to capture g4.
-    The process of adding different secondary gRNA that will complement the 'Best' gRNA is repeated for 'n_with_best_guide'
+    The process of adding different secondary gRNA that will complement the 'Best' gRNA is repeated for 'n_multiplx'
     times (default=5) and than another 'Best' candidate is selected and the whole process is repeated for 'number_of_groups'
     times (default=20)
     Args:
@@ -679,7 +643,7 @@ def chips_main(crispys_output_path: str = None,
         lower_intersect_limit: Lower limit for the intersection between the off-target and a genomic region.
         upper_intersect_limit: Upper limit for the intersection between the off-target and a genomic region.
         number_of_groups: The number of groups of 'best' multiplxes to output
-        n_with_best_guide: The number of multiplxes for each 'Best' gRNA
+        n_multiplx: The number of multiplxes for each 'Best' gRNA
         n_sgrnas: the number of gRNA in multiplx
         threads: number if cpu to use with crispritz
         number_of_singletons: how many singletons to add to each group of gRNAs of internal node
@@ -724,11 +688,7 @@ def chips_main(crispys_output_path: str = None,
     list_of_subgroup_no_offtargets = recreate_subgroup_lst(list_of_candidates_filtered)
     # insert singleton subgroup to subgroups without singleton and create a list of subgroups without sinlgetons
     new_subgroups_lst = add_singletons_to_subgroup(list_of_subgroup_no_offtargets, number_of_singletons)
-    # dict1 = {can.seq:can for can in list_of_subgroup_no_offtargets[0].candidates_list if
-    #        "AT4G08300" in can.genes_score_dict.keys()}
-    # dict2 = {can.seq: can for can in list_of_subgroup_no_offtargets[1].candidates_list if
-    #          "AT4G08300" in can.genes_score_dict.keys()}
-    # lst = [dict1[seq] for seq in dict1.keys() if seq not in dict2.keys()]
+
     # Stop if the list is empty
     if not new_subgroups_lst:
         print("No input for Chips\n")
@@ -752,7 +712,7 @@ def chips_main(crispys_output_path: str = None,
         n = number_of_groups
         while n > 0:
             # get results for a group of guides with the same 'best' guide
-            bestsgroup = get_best_groups(subgroup, n_with_best_guide, n_sgrnas)
+            bestsgroup = get_best_groups(subgroup, n_multiplx, n_sgrnas)
             # if there are no more candidate it will return None
             if not bestsgroup:
                 break
@@ -793,7 +753,7 @@ def chips_main(crispys_output_path: str = None,
         pickle.dump(final_dict, f)
     # write results to csv file
     create_output_multiplex(crispys_output_path, final_dict, number_of_groups,
-                            n_with_best_guide, n_sgrnas, chips_output_name)
+                             n_multiplx, n_sgrnas, chips_output_name)
 
 
 
@@ -836,7 +796,7 @@ def parse_arguments(parser_obj: argparse.ArgumentParser):
     parser_obj.add_argument('--number_of_groups', '-groups', type=int, default=20,
                              help='Number of Best Groups i.e. number of BestSgGroup objects')
 
-    parser_obj.add_argument('--n_with_best_guide', '-n_guide', type=int, default=5,
+    parser_obj.add_argument('--n_multiplx', '-n_multi', type=int, default=5,
                              help="Number of multiplexes for each group of 'Best guide'")
 
     parser_obj.add_argument('--n_sgrnas', '-sgrnas', type=int, default=2,
@@ -865,20 +825,20 @@ def parse_arguments(parser_obj: argparse.ArgumentParser):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     args = parse_arguments(parser)
-    chips_main(crispys_output_path=args.crispys_output_path,
-               crispys_output_name=args.crispys_output_name,
-               chips_output_name=args.chips_output_name,
-               restriction_site=args.restriction_site,
-               genome_by_chr_path=args.genome_by_chr_path,
-               pam_file_path=args.pam_file_path,
-               gff_file_path=args.gff_file_path,
-               max_number_of_mismatches=args.max_number_of_mismatches,
-               lower_intersect_limit=args.lower_intersect_limit,
-               upper_intersect_limit=args.upper_intersect_limit,
-               number_of_groups=args.number_of_groups,
-               n_with_best_guide=args.n_with_best_guide,
-               n_sgrnas=args.n_sgrnas,
-               threads=args.threads,
-               number_of_singletons=args.number_of_singletons,
-               scoring_function=args.scoring_function,
-               sg_per_node=args.sg_per_node)
+    chips_main( crispys_output_path=args.crispys_output_path,
+                crispys_output_name=args.crispys_output_name,
+                chips_output_name=args.chips_output_name,
+                restriction_site=args.restriction_site,
+                genome_by_chr_path=args.genome_by_chr_path,
+                pam_file_path=args.pam_file_path,
+                gff_file_path=args.gff_file_path,
+                max_number_of_mismatches=args.max_number_of_mismatches,
+                lower_intersect_limit=args.lower_intersect_limit,
+                upper_intersect_limit=args.upper_intersect_limit,
+                number_of_groups=args.number_of_groups,
+                n_multiplx=args.n_multiplx,
+                n_sgrnas=args.n_sgrnas,
+                threads=args.threads,
+                number_of_singletons=args.number_of_singletons,
+                scoring_function=args.scoring_function,
+                sg_per_node=args.sg_per_node )
