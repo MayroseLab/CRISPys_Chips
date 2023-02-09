@@ -200,13 +200,13 @@ def get_genes_of_nodes(multiplex_dict, node):
     return set(genes)
 
 
-def write_library_csv(path: str, bestgroup_dict: Dict, output_name: str, n_families: int, n_singletons: int,
+def write_library_csv(path: str, res_dict: Dict, output_name: str, n_families: int, n_singletons: int,
                       n_no_input: int, families_with_no_output: int):
     """
     This function is used to create the final chips library csv output
     Args:
         path: path to write the file
-        bestgroup_dict: chips results, a dictionary of best_seq:BestSgGroup object
+        res_dict: chips results, a dictionary of best_seq:BestSgGroup object
         output_name: name of output file
         n_families: nu,ber of families that used for CRISPys
         n_singletons: number of families with no chips output because they had only singletons gRNAs
@@ -222,11 +222,11 @@ def write_library_csv(path: str, bestgroup_dict: Dict, output_name: str, n_famil
     f.write(f"# CRISPys-Chips output. out of {n_families} families {n_singletons} had only singletons and {n_no_input}"
             f" had no input for Chips and {families_with_no_output} with no chips/crispys output\n")
 
-    for bestgroup in bestgroup_dict.values():
+    for subgroup_list in res_dict.values():
         # write the sequence of best guide
-        f.write(f"#Group of:,{bestgroup.best_candidate.seq}\n")
+        # f.write(f"#Group of:,{bestgroup.best_candidate.seq}\n")
         # go over each pair (or more) of multiplex and write it to the file
-        for subgroup in bestgroup.subgroups:
+        for subgroup in subgroup_list:
             sub_tree_display(subgroup.candidates_list, f)
         f.write("\n")
     f.close()

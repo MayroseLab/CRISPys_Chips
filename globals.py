@@ -16,7 +16,7 @@ genome_by_chr_path = "/groups/itay_mayrose/udiland/crispys_chips_arabidopsis/ath
 
 pam_file_path = "/groups/itay_mayrose/udiland/crispys_chips_arabidopsis/pam"
 
-gff_file = "/groups/itay_mayrose/udiland/crispys_chips_arabidopsis/annotation.all_transcripts.all_features.ath.gff3.gz"
+gff_file = "/groups/itay_mayrose/udiland/crispys_chips_arabidopsis/annotation.all_transcripts.all_features_modified.ath.gff3" # this file was fixed by omer for one wrong entry
 
 # To create the gff db file for gffutils in create_family_folders, run the following:
 # db = gffutils.create_db(path_to_gff,path_to_output_database, merge_strategy="create_unique")
@@ -42,7 +42,7 @@ moff_mtx2 = None
 feature_score_dict = {"gene": 0.15, "Any": 0.15,  "exon": 0.15}
 
 # regions that will be ignored
-ignore_regions = {"pseudogene", "pseudogenic_transcript"}
+ignore_regions = {"pseudogene", "pseudogenic_transcript", "pseudogenic_exon"}
 
 # -------------------------------------------------------------------------------
 # I used the 'make_family_genes_dict_from_plaza_tbl' function from 'create_families_folders.py' to save pickle file of family_name:gene_in_family dictionary

@@ -29,7 +29,7 @@ def check_if_results_exist(fam_path, crispys_output_name, chips_output_name):
 
 
 def run(code_path: str, main_folder_path: str, crispys_name: str = "crispys_output", chips_name: str = "chips",
-        n_mm: int = 4, lower: int = 10, upper: int = 20, n_groups: int = 20, n_best: int = 5, n_grna: int = 2,
+        n_mm: int = 4, lower: int = 10, upper: int = 20, n_groups: int = 20, n_multiplx: int = 5, n_grna: int = 2,
         n_singletons: int = 5, scoring: str = 'moff', ncpu: int = 4, mem: int = 16, queue: str = "itaym",
         restriction_site: str = "None", sg_per_node: int = 4, chips_output_name: str = "chips"):
     """
@@ -64,8 +64,8 @@ def run(code_path: str, main_folder_path: str, crispys_name: str = "crispys_outp
             command = f"cd {fam_path}\npython {code_path}/chips_main.py -crispys {fam_path} " \
                       f"-crispys_name {crispys_name} -chips_name {chips_name} -genome_chr {globals.genome_by_chr_path} " \
                       f"-pam_file {globals.pam_file_path} -gff {globals.gff_file} -n_mm {n_mm} -lower {lower}" \
-                      f" -upper {upper} -groups {n_groups} -n_guide {n_best} -sgrnas {n_grna} -th {ncpu} -n_singletons " \
-                      f"{n_singletons} -scoring {scoring} -restriction {restriction_site} -min_sg {sg_per_node}"
+                      f" -upper {upper} -groups {n_groups} -n_multi {n_multiplx} -sgrnas {n_grna} -th {ncpu} -n_singletons " \
+                      f"{n_singletons} -scoring {scoring} -restriction {restriction_site} -node_sg {sg_per_node}"
             sh_file_path = os.path.join(fam_path, f"{family}_{crispys_name}_{chips_output_name}.sh")
             with open(sh_file_path, "w") as f:
                 f.write(f"{header}\n{command}")
@@ -75,5 +75,5 @@ def run(code_path: str, main_folder_path: str, crispys_name: str = "crispys_outp
 if __name__ == '__main__':
     run(code_path="/groups/itay_mayrose/udiland/CRISPys_Chips",
          main_folder_path="/groups/itay_mayrose/udiland/crispys_chips_arabidopsis/families", ncpu=1, queue="itaym",
-         crispys_name="moff_0.15", chips_name="chips_moff0.15_5sg", n_mm=4, n_groups=20, n_best=5, n_grna=2, n_singletons=5,
-         scoring="moff", restriction_site="GGTCTC", sg_per_node=5)
+         crispys_name="moff_0.15", chips_name="chips_moff0.15_3sg", n_mm=4, n_groups=20, n_multiplx=5, n_grna=2, n_singletons=5,
+         scoring="moff", restriction_site="GGTCTC", sg_per_node=3)
