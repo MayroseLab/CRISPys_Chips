@@ -237,20 +237,19 @@ def recreate_subgroup_lst(list_of_candidates_filtered: List) -> List:
     return subgroup_lst
 
 
-# def subgroup2dict(subgroup: SubgroupRes) -> Dict:
-#     """
-#     This function take a subgroup object and output a dictionary of sequence:candidate
-#     Args:
-#         subgroup: subgroups objects
-#
-#     Returns: a dictionary of candidates
-#     """
-#     candidates_dict = {}
-#     for candidate in subgroup.candidates_list:
-#         # if the candidate is in the dictionary replace it with the same one that have higher cut expectation (if exist)
-#         if candidate.seq not in candidates_dict or candidate.cut_expectation > candidates_dict[candidate.seq].cut_expectation:
-#             candidates_dict[candidate.seq] = candidate
-#     return candidates_dict
+def subgroup2dict(subgroup: SubgroupRes) -> Dict:
+    """
+    This function take a subgroup object and output a dictionary of sequence:candidate
+    Args:
+        subgroup: subgroups objects
+    Returns: a dictionary of candidates
+    """
+    candidates_dict = {}
+    for candidate in subgroup.candidates_list:
+        # if the candidate is in the dictionary replace it with the same one that have higher cut expectation (if exist)
+        if candidate.seq not in candidates_dict or candidate.cut_expectation > candidates_dict[candidate.seq].cut_expectation:
+            candidates_dict[candidate.seq] = candidate
+    return candidates_dict
 
 
 def select_secondary(primery_grna, candidates_list):
@@ -280,19 +279,23 @@ def select_secondary(primery_grna, candidates_list):
         return
     return chosen_grna
 
-def get_gene_score(primary_grna, grna, gene):
-    """
 
+def get_gene_score(primary_grna: CandidateWithOffTargets, grna: CandidateWithOffTargets, gene: str) -> float:
+    """
+    This function calculate the probability of two gRNAs to cut a gene
+    specifically its calculate the probability of NOT targeting the gene with both guides which is the multiplication of
+    the (1 - score) for guide 1 with (1 - score) of  guide 2.
+    Than it returns 1 - (p of not targeting both) which is the probability to target at least one of them.
     Args:
-        primary_grna:
-        grna:
+        primary_grna: gRNA1 - the guide that
+        grna: gRNA2
         gene:
 
     Returns:
 
     """
-    score = 1 - ((1 - primary_grna.genes_score_dict.get(gene, 0))*(1 - grna.genes_score_dict.get(gene, 0)))
-    return score
+    prob = 1 - ((1 - primary_grna.genes_score_dict.get(gene, 0))*(1 - grna.genes_score_dict.get(gene, 0)))
+    return prob
 
 def check_overlap_positions(candidate: Candidate, can_pos_dict=None):
     """
@@ -399,8 +402,6 @@ def choose_multiplx(subgroup: SubgroupRes, n_sgrnas: int = 2, best_candidate: Ca
     Returns: subgroup object containing a list of candidates, Candidate object containing the 'best candidate'
 
     """
-    # make a dictionary of seq:candidate from crispys results
-    # candidates_dict = subgroup2dict(subgroup)
 
     # initate a dict that will store the gRNAs selected
     selected_candidates = {}
@@ -670,8 +671,8 @@ def chips_main(crispys_output_path: str = None,
                                       pam_file_path, max_number_of_mismatches, lower_intersect_limit,
                                       upper_intersect_limit, threads, scoring_function)
 
-    # optionaly, get the original family genes name (before the split to smaller families) in order to ignore off-taeget
-    # hiting these genes
+    # optionally, get the original family genes name (before the split to smaller families) in order to ignore off-taeget
+    # hitting these genes
     family_name = list_of_subgroup_results[0].family_name
     if include_all_family_gene:
         familiy_genes_dict = pickle.load(open(globals.familiy_genes_dict_path, 'rb'))
@@ -728,7 +729,6 @@ def chips_main(crispys_output_path: str = None,
                 skip_candidate = check_overlap_positions(bestsgroup.best_candidate, pos_dict)
                 if skip_candidate:
                     subgroup.candidates_list.remove(subgroup_dict[bestsgroup.best_candidate.seq])
-                    # del bestsgroup_dict[bestsgroup.best_candidate.seq]
                     continue
                 else:
                     bestsgroup_dict[bestsgroup.best_candidate.seq] = bestsgroup
