@@ -14,7 +14,6 @@ import Candidate
 from SubgroupRes import SubgroupRes
 from crunch_classes import CandidateWithOffTargets
 random.seed(42)
-
 """
 This module will takes CRISPys output (list of SubgroupRes) and will output group of n guides that will target the 
 maximum number of the genes in a group of genes (internal node).
@@ -81,14 +80,14 @@ class BestSgGroup:
 
 def check_for_singletons(subgroup_list: List):
     """
-    This function check if crispys result contain only singletons
-    and if so return True, otherwise return False
+    This function check if crispys result contain only singletons (of more than one gene)
+    and if so create subgroup object with list of singletons for each internal node,
+    if there is at least one subgroup with gRNA targeting multiple genes return the original subgroup list
     Args:
         subgroup_list: list of SubgroupRes
 
     Returns:
-            if some of the subgroup target more than one gene return False
-            if the results target only one gene return True
+            list of subgrpus objects
     """
     # go over the results and if you find results for internal node (results for more than one gene) exit the function
     for subgroup in subgroup_list:
@@ -150,6 +149,7 @@ def add_singletons_to_subgroup(subgroup_list: list, number_of_singletons: int = 
             singletons_dict[subgroup.genes_lst[0]] = subgroup.candidates_list
         else:
             subgroup_list_no_singles.append(subgroup)
+
     # sort singletons by on target score
     singletons_dict = {k: sorted(v, key=lambda x: x.on_target_score, reverse=True) for k, v in singletons_dict.items()}
 
@@ -169,6 +169,9 @@ def add_singletons_to_subgroup(subgroup_list: list, number_of_singletons: int = 
                         if i == number_of_singletons:
                             break
                         if single_candidate.seq not in subgroup_cand_seqs:
+                            # add to the selected singleton the subgroup attribute of the subgroup he will be added to
+                            single_candidate.subgroup = subgroup.candidates_list[0].subgroup
+                            # accumulate singletons to later add to subgroup
                             singletons2add.append(single_candidate)
                             i += 1
         # shuffle the singletons list and add it to subgroup candidate list
@@ -252,15 +255,17 @@ def subgroup2dict(subgroup: SubgroupRes) -> Dict:
     return candidates_dict
 
 
-def select_secondary(primery_grna, candidates_list):
+def select_secondary(primery_grna: CandidateWithOffTargets, candidates_list: List, lambda_coef: float = 0.9):
     """
-
+    This function get the primary gRNA and a list of other gRNAs and return the gRNA that is the best match for the
+    primary to target the genes in the internal node
     Args:
-        primery_grna:
-        candidates_list:
+        primery_grna: gRNA that has been selected to be the primary in a multiplex
+        candidates_list: list of gRNAS
+        lambda_coef: a coefficient to multiply by the score of a gRNA, this is used in the probability calculation
 
     Returns:
-
+        the gRNA that best complement the primary gRNA to target all genes
     """
     # get all genes in node
     genes = primery_grna.subgroup.genes_in_node
@@ -271,7 +276,7 @@ def select_secondary(primery_grna, candidates_list):
     for grna in candidates_list:
         current_grna_prob = 0
         for gene in genes:
-            current_grna_prob += get_gene_score(primery_grna, grna, gene)
+            current_grna_prob += get_gene_score(primery_grna, grna, gene, lambda_coef)
         if current_grna_prob > max_cut_probability:
             max_cut_probability = current_grna_prob
             chosen_grna = grna
@@ -280,22 +285,25 @@ def select_secondary(primery_grna, candidates_list):
     return chosen_grna
 
 
-def get_gene_score(primary_grna: CandidateWithOffTargets, grna: CandidateWithOffTargets, gene: str) -> float:
+def get_gene_score(primary_grna: CandidateWithOffTargets, grna: CandidateWithOffTargets, gene: str,
+                   lambda_coef: float = 0.9) -> float:
     """
     This function calculate the probability of two gRNAs to cut a gene
     specifically its calculate the probability of NOT targeting the gene with both guides which is the multiplication of
     the (1 - score) for guide 1 with (1 - score) of  guide 2.
     Than it returns 1 - (p of not targeting both) which is the probability to target at least one of them.
     Args:
-        primary_grna: gRNA1 - the guide that
-        grna: gRNA2
-        gene:
+        primary_grna: gRNA1 - the guide that was selected as primary
+        grna: gRNA2 - the guide that is tested to be matched with the primary
+        gene: the name of the gene to use to calculate the probability
+        lambda_coef: a scaling factor of the score for each target it is used
 
     Returns:
-
+            the probability of the two guides to target the gene.
     """
-    prob = 1 - ((1 - primary_grna.genes_score_dict.get(gene, 0))*(1 - grna.genes_score_dict.get(gene, 0)))
+    prob = 1 - ((1 - (lambda_coef * primary_grna.genes_score_dict.get(gene, 0)))*(1 - (lambda_coef * grna.genes_score_dict.get(gene, 0))))
     return prob
+
 
 def check_overlap_positions(candidate: Candidate, can_pos_dict=None):
     """
@@ -382,6 +390,7 @@ def check_duplicates(selected_cand_dict: dict, guide_seq_dict: Dict=dict()):
     guide_seq_dict[tuple(multiplx_seqs)[0]] = sum([len(guide.targets_dict.keys()) for guide in selected_cand_dict.values()])
     return False
 
+
 def choose_multiplx(subgroup: SubgroupRes, n_sgrnas: int = 2, best_candidate: Candidate = None,
                     pos_dict: Dict = None):
     """
@@ -424,7 +433,7 @@ def choose_multiplx(subgroup: SubgroupRes, n_sgrnas: int = 2, best_candidate: Ca
         # check if no candidates left
         if not subgroup.candidates_list:
             return None
-        # select the secondery gRNAs
+        # select the secondary gRNAs
         candidate = select_secondary(best_candidate, subgroup.candidates_list)
         # calculate the guide position
         skip_candidate = check_overlap_positions(candidate, pos_dict)
@@ -474,6 +483,8 @@ def get_best_groups(subgroup: SubgroupRes, n_multiplx: int, n_sgrnas: int = 2):
     """
     # make a copy of subgroup
     subgroup_temp = copy.deepcopy(subgroup)
+    # randomly shuffle the gRNA list
+    random.shuffle(subgroup_temp.candidates_list)
     # if no more candidates left stop the search
     if not subgroup_temp.candidates_list:
         return None
@@ -513,7 +524,7 @@ def get_best_groups(subgroup: SubgroupRes, n_multiplx: int, n_sgrnas: int = 2):
     return current_best
 
 
-def add_best_candidate_to_multiplx(output_dict):
+def add_best_candidate_to_multiplx(output_dict: Dict):
     """
     This function add the candidate object of the 'Best' candidate for each subgroup object
     it is done in order to coolect all multiplx of the same 'Best gRNA' together in later steps.
@@ -568,7 +579,11 @@ def filter_duplicates_from_final_dict(res_dict: Dict) -> Dict:
 
 def select_top_sg_in_node(multiplx_dict: Dict, sg_per_node=4) -> Dict:
     """
-
+    This function take the dictionary of chips results {(seqs_tuple):subgroupres} and output dictionary of
+    {internal_node:n top gRNAs}
+    First it calculate the total score of each multiplex (sun of cut expectation) and add it as an attribute to each multiplex,
+    Than it re-create the tree structure by assigning to each internal node its candidates and finaly it will return
+    the top 'sg_per_gene' for each internal node.
     Args:
         multiplx_dict: dictionary of multiplxes
         sg_per_node: the number of top gRNAs to select from each internal node
@@ -577,8 +592,10 @@ def select_top_sg_in_node(multiplx_dict: Dict, sg_per_node=4) -> Dict:
 
     """
     res_dict = {}
-    # create alist of all multiplexes
+    # create a list of all multiplexes
     multiplx_lst = list(multiplx_dict.values())
+    # shuffle list
+    random.shuffle(multiplx_lst)
     # add score of all gRNAs in muktpilx
     for multiplx in multiplx_lst:
         total_score = 0
@@ -659,7 +676,7 @@ def chips_main(crispys_output_path: str = None,
     pickle_name = [file for file in os.listdir(crispys_output_path) if file.endswith(f"{crispys_output_name}.p")][0]
     pickle_file = os.path.join(crispys_output_path, pickle_name)
     list_of_subgroup_results = pickle.load(open(pickle_file, 'rb'))
-    # Check if the results has internal node
+    # Check the results for singletons, if there are only singletons for more than one gene create results for the internal node from singletons
     list_of_subgroup_results = check_for_singletons(list_of_subgroup_results)
     # Convert the list of internal node results into a list of CandidateWithOffTargets object.
     list_of_candidates = concat_candidates_from_subgroups(list_of_subgroup_results)

@@ -201,4 +201,4 @@ def collect_fam_res(main_families_path: str, chips_name: str, log_file: str, lib
                       families_with_singletons, families_with_no_chips_input, families_with_no_output)
 
 collect_fam_res("/groups/itay_mayrose/udiland/crispys_chips_arabidopsis/families", "chips_moff0.15_3sg",
-                "crispys_log.txt","/groups/itay_mayrose/udiland/crispys_chips_arabidopsis", "moff_0.15_3sg_old")
+                "crispys_log.txt","/groups/itay_mayrose/udiland/crispys_chips_arabidopsis", "moff_0.15_3sg_new")
