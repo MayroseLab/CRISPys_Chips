@@ -1,8 +1,8 @@
 from chips_main import chips_main
 
-chips_main(crispys_output_path="/groups/itay_mayrose/udiland/crispys_chips_arabidopsis/families/HOM05D000028_2",
+chips_main(crispys_output_path="/groups/itay_mayrose/udiland/crispys_chips_arabidopsis/families/HOM05D000028_11",
             crispys_output_name="moff_0.15",
-            chips_output_name="chips_moff0.15_5sg_new_alg",
+            chips_output_name="chips_test",
             restriction_site="GGTCTC",
             genome_by_chr_path="/groups/itay_mayrose/udiland/crispys_chips_arabidopsis/ath_split_files",
             pam_file_path="/groups/itay_mayrose/udiland/crispys_chips_arabidopsis/pam",
@@ -17,3 +17,12 @@ chips_main(crispys_output_path="/groups/itay_mayrose/udiland/crispys_chips_arabi
             number_of_singletons=5,
             scoring_function="moff",
             sg_per_node=3)
+
+
+# 7 genes family : /groups/itay_mayrose/udiland/crispys_chips_arabidopsis/families/HOM05D000028_11
+
+# 4 genes familiy: /groups/itay_mayrose/udiland/crispys_chips_arabidopsis/families/HOM05D000028_2
+
+# 3 genes family: /groups/itay_mayrose/udiland/crispys_chips_arabidopsis/families/HOM05D000028_8 "crispys_test"
+
+# 2 genes family: /groups/itay_mayrose/udiland/crispys_chips_arabidopsis/families/HOM05D000177_1
