@@ -78,52 +78,20 @@ class BestSgGroup:
         return f"{self.best_candidate} , {self.subgroups_list}"
 
 
-def check_for_singletons(subgroup_list: List):
+def check_if_one_gene(subgroup_list: List):
     """
-    This function check if crispys result contain only singletons (of more than one gene)
-    and if so create subgroup object with list of singletons for each internal node,
-    if there is at least one subgroup with gRNA targeting multiple genes return the original subgroup list
+    This function check if crispys result contain output for only one gene
+    and if so will quit the program
     Args:
         subgroup_list: list of SubgroupRes
 
     Returns:
-            list of subgrpus objects
     """
-    # go over the results and if you find results for internal node (results for more than one gene) exit the function
-    for subgroup in subgroup_list:
-        if len(subgroup.genes_in_node) > 1:
-            if subgroup.candidates_list:
-                return subgroup_list
-
     # if the results are only singletons check how many genes in the results and if only one gene targeted exit the program
     number_of_genes_covered = len(set([str(candidate.genes_score_dict.keys()) for subgroup in subgroup_list for candidate in subgroup.candidates_list]))
     if number_of_genes_covered == 1:
         print(f"Only one gene targeted in {subgroup_list[0].family_name}")
         exit()
-
-    # if the results are of multiple singletons only create subgroups that
-    # create a dictionary of gene:list_pf_candidates
-    singletones_dict = {subgroup.genes_in_node[0]:subgroup.candidates_list for subgroup in subgroup_list if subgroup.candidates_list}
-    # use the dictionary to create candidates lists for each internal node
-    # first sort singletons by on target score
-    singletones_dict = {key:sorted(value, key=lambda x: x.on_target_score, reverse=True) for key,value in singletones_dict.items()}
-    for subgroup in subgroup_list:
-        if not subgroup.candidates_list:
-            for gene in subgroup.genes_in_node:
-                try:
-                    subgroup.candidates_list += singletones_dict[gene]
-                except KeyError:
-                    continue
-    # return the list of subgroups with only internal nodes that have more than one gene
-    new_subgroup_list = []
-    for subgroup in subgroup_list:
-        # count gene in subgroupres
-        genes_covered = len(set([str(candidate.genes_score_dict.keys()) for candidate in subgroup.candidates_list]))
-        if genes_covered > 1:
-            new_subgroup_list.append(subgroup)
-
-    return new_subgroup_list
-
 
 
 
@@ -170,9 +138,11 @@ def add_singletons_to_subgroup(subgroup_list: list, number_of_singletons: int = 
                             break
                         if single_candidate.seq not in subgroup_cand_seqs:
                             # add to the selected singleton the subgroup attribute of the subgroup he will be added to
-                            single_candidate.subgroup = subgroup.candidates_list[0].subgroup
+                            single_candidate2add = copy.deepcopy(single_candidate)
+                            single_candidate2add.subgroup = subgroup
+                            single_candidate2add.subgroup.candidates_list = []
                             # accumulate singletons to later add to subgroup
-                            singletons2add.append(single_candidate)
+                            singletons2add.append(single_candidate2add)
                             i += 1
         # shuffle the singletons list and add it to subgroup candidate list
         random.shuffle(singletons2add)
@@ -201,9 +171,10 @@ def concat_candidates_from_subgroups(list_of_subgroup_results: List[SubgroupRes]
     """
     list_of_candidates = []
     for subgroup in list_of_subgroup_results:
-        for candidate in subgroup.candidates_list:
-            new_candidate = create_candidatewithofftargets_object(candidate, subgroup)
-            list_of_candidates.append(new_candidate)
+        if subgroup.candidates_list:
+            for candidate in subgroup.candidates_list:
+                new_candidate = create_candidatewithofftargets_object(candidate, subgroup)
+                list_of_candidates.append(new_candidate)
     return list_of_candidates
 
 def remove_candidates_with_restriction_site(list_of_candidates: List[CandidateWithOffTargets],
@@ -219,7 +190,7 @@ def remove_candidates_with_restriction_site(list_of_candidates: List[CandidateWi
     return [candidate for candidate in list_of_candidates if restriction_site not in candidate.seq and
             restriction_site not in reverse_complement(candidate.seq)]
 
-def recreate_subgroup_lst(list_of_candidates_filtered: List) -> List:
+def recreate_subgroup_lst(list_of_candidates_filtered: List, list_of_subgroup_results) -> List:
     """
     This function take a list of candidates (that passed off-targets filtering) and output a list os subgroupres objects
     each contain the candidate of an internal node of the gene tree (the same structure of crispys output)
@@ -229,6 +200,7 @@ def recreate_subgroup_lst(list_of_candidates_filtered: List) -> List:
     Returns:
         list of SubgroupRes
     """
+
     subgroups_dict = {}
     for candidate in list_of_candidates_filtered:
         if tuple(candidate.subgroup.genes_in_node) not in subgroups_dict.keys():
@@ -237,6 +209,11 @@ def recreate_subgroup_lst(list_of_candidates_filtered: List) -> List:
             subgroups_dict[tuple(candidate.subgroup.genes_in_node)].append(candidate)
     # make a list of subgroupRes objects
     subgroup_lst = [SubgroupRes(list(genes), can_lst, can_lst[0].subgroup.name, list(genes)) for genes, can_lst in subgroups_dict.items()]
+    # add subgroup that has no candidates (will be added with empty candidates_list)
+    for subgroup in list_of_subgroup_results:
+        if not subgroup.candidates_list:
+            subgroup_lst += [SubgroupRes(subgroup.genes_lst, [], subgroup.name, subgroup.genes_in_node)]
+
     return subgroup_lst
 
 
@@ -669,15 +646,15 @@ def chips_main(crispys_output_path: str = None,
         sg_per_node: the number of gRNA to select from each subgroup of genes (internal node)
 
     Returns:
-
+        write several output file including csv with final multiplex
     """
 
     # read CRISPys results
     pickle_name = [file for file in os.listdir(crispys_output_path) if file.endswith(f"{crispys_output_name}.p")][0]
     pickle_file = os.path.join(crispys_output_path, pickle_name)
     list_of_subgroup_results = pickle.load(open(pickle_file, 'rb'))
-    # Check the results for singletons, if there are only singletons for more than one gene create results for the internal node from singletons
-    list_of_subgroup_results = check_for_singletons(list_of_subgroup_results)
+    # Check the results if there is only one gene
+    check_if_one_gene(list_of_subgroup_results)
     # Convert the list of internal node results into a list of CandidateWithOffTargets object.
     list_of_candidates = concat_candidates_from_subgroups(list_of_subgroup_results)
     # remove restriction site
@@ -703,7 +680,7 @@ def chips_main(crispys_output_path: str = None,
                                                genes_to_ignore_set)
 
     # re-create the list of subgroup (crispys output from the sgRNAs that pass the off-target filtering)
-    list_of_subgroup_no_offtargets = recreate_subgroup_lst(list_of_candidates_filtered)
+    list_of_subgroup_no_offtargets = recreate_subgroup_lst(list_of_candidates_filtered, list_of_subgroup_results)
     # insert singleton subgroup to subgroups without singleton and create a list of subgroups without sinlgetons
     new_subgroups_lst = add_singletons_to_subgroup(list_of_subgroup_no_offtargets, number_of_singletons)
 
