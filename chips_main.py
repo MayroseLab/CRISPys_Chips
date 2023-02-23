@@ -140,7 +140,6 @@ def add_singletons_to_subgroup(subgroup_list: list, number_of_singletons: int = 
                             # add to the selected singleton the subgroup attribute of the subgroup he will be added to
                             single_candidate2add = copy.deepcopy(single_candidate)
                             single_candidate2add.subgroup = subgroup
-                            single_candidate2add.subgroup.candidates_list = []
                             # accumulate singletons to later add to subgroup
                             singletons2add.append(single_candidate2add)
                             i += 1
