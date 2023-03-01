@@ -39,7 +39,8 @@ moff_mtx2 = None
 # -----------------------------------------------------------
 
 # any off-target with score above the threshold will cause the candidate to be filtered
-feature_score_dict = {"gene": 0.15, "Any": 0.15,  "exon": 0.15}
+#feature_score_dict = {"gene": 0.15, "Any": 0.15,  "exon": 0.15}
+feature_score_dict = {"Any": 0}
 
 # regions that will be ignored
 ignore_regions = {"pseudogene", "pseudogenic_transcript", "pseudogenic_exon"}
